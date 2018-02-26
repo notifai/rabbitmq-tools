@@ -1,0 +1,55 @@
+{
+  "name": "rabbitmq-tools",
+  "version": "0.0.10",
+  "description": "Library for rabbitmq communication",
+  "main": "./dist/index.js",
+  "scripts": {
+    "babel-node": "babel-node",
+    "start": "nodemon --exec npm run babel-node -- ./src/index.js",
+    "build": "babel src -d dist",
+    "lint": "eslint src",
+    "prepublishOnly": "rm -rf dist && npm run build"
+  },
+  "author": {
+    "name": "Trysimply Developers Team",
+    "email": "developer@trysimply.com"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/trysimply/rabbitmq-tools"
+  },
+  "license": "Apache License 2.0",
+  "dependencies": {
+    "amqplib": "0.5.1",
+    "babel-polyfill": "^6.26.0",
+    "chalk": "^2.3.1",
+    "jsonschema": "^1.1.1",
+    "lodash": "^4.17.5",
+    "rxjs": "^5.5.6",
+    "uuid": "^3.0.1"
+  },
+  "devDependencies": {
+    "babel-cli": "^6.26.0",
+    "babel-eslint": "^8.2.2",
+    "babel-plugin-syntax-object-rest-spread": "^6.13.0",
+    "babel-plugin-transform-decorators": "^6.24.1",
+    "babel-plugin-transform-decorators-legacy": "^1.3.4",
+    "babel-preset-env": "^1.6.1",
+    "eslint": "^4.17.0",
+    "eslint-config-airbnb": "^16.1.0",
+    "eslint-plugin-import": "^2.8.0",
+    "nodemon": "^1.14.12"
+  },
+  "babel": {
+    "plugins": [
+      "syntax-object-rest-spread",
+      "transform-decorators-legacy"
+    ],
+    "presets": [
+      "env"
+    ]
+  },
+  "pre-commit": [
+    "lint"
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "extends": "airbnb/base",
+  "parser": "babel-eslint",
+  "rules": {
+    "semi": [2, "never"],
+    "comma-dangle": ["error", "never"],
+    "no-use-before-define": "off",
+    "arrow-parens": ["error", "as-needed"],
+    "import/prefer-default-export": "off"
+  }
+}
