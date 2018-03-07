@@ -2,6 +2,9 @@
 
 This library is aimed to ease [amqplib](https://github.com/squaremo/amqp.node) usage.
 
+[![Commitizen friendly](https://img.shields.io/badge/commitizen-friendly-brightgreen.svg)](http://commitizen.github.io/cz-cli/)
+
+
 ## Installation:
 ```
 npm i rabbitmq-tools -S
@@ -43,5 +46,6 @@ request(routingKey, message)
 
 ## Roadmap
 * Implement more flexible amqp configurations
+* Cover with tests
 * Improve documentation
 * Implement logging disabling
