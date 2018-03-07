@@ -15,8 +15,8 @@ export class Messenger {
 
   constructor(options) {
     this.appId = options.appId || 'default-app'
-    this.logger = options.logger || console
-    this.channelStore = openChannel(connect(options.url))
+    this.logger = typeof options.logger === 'undefined' ? console : options.logger
+    this.channelStore = openChannel(connect(options.url, this.logger), this.logger)
     this.replyQueues = new Set()
     this.requests = new Map()
 
@@ -50,7 +50,7 @@ export class Messenger {
 
     this.publish(exchange, routingKey, message, { replyTo, correlationId })
 
-    return this.requests.get(correlationId).first().toPromise()
+    return this.requests.get(correlationId).first().toPromise().then(({ data }) => data)
   }
 
   assertConsume(channel, queue, handler) {
@@ -69,22 +69,14 @@ export class Messenger {
         .get(message.properties.correlationId)
         .next(reply)
 
-      const logMessage = reply.error ?
-        logging.toIncomingError(message, reply.error) :
-        logging.toResponse(message)
-
-      this.log(logMessage, reply)
+      this.log(logging.formatIncomingResponse(message, reply.error), reply)
     }
   }
 
   async _publish(exchange, routingKey, message, options) {
     const channel = await this.getChannel()
 
-    this.log(logging.toOutgoingRequest({
-      correlationId: options.correlationId,
-      routingKey,
-      appId: this.appId
-    }), message)
+    this.log(logging.formatOutgoingRequest(message))
 
     return channel.publish(
       exchange,
@@ -113,7 +105,11 @@ export class Messenger {
   }
 
   log(message, data) {
-    this.logger.log(logging.toMeta(message, 'AMQP-Client'))
+    if (!this.logger) {
+      return
+    }
+
+    this.logger.log(logging.formatMeta('AMQP', message))
 
     if (data) {
       this.logger.dir(data, { colors: true, depth: 10 })

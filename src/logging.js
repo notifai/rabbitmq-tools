@@ -1,55 +1,50 @@
 import { yellow, red, blue, grey } from 'chalk'
 
-export const toIncomingRequest = message => {
-  const {
-    fields: { routingKey },
-    properties: { correlationId, appId }
-  } = message
+const formatId = message => `{${yellow(message.properties.correlationId.slice(0, 8))}}`
 
-  return [
-    `{${yellow(correlationId.slice(0, 8))}}`,
-    `Received ${yellow(routingKey)}`,
-    `from ${yellow(appId)}`
-  ]
-}
+export const formatOutgoingRequest = message => [
+  `${formatId(message)}`,
+  `Request '${blue(message.fields.routingKey)}'`,
+  `sent by '${blue(message.properties.appId)}'`
+].join(' ')
 
-export const toResponse = message => {
-  const { replyTo, correlationId, appId } = message.properties
-  return [
-    `{${blue(correlationId.slice(0, 8))}}`,
-    `Response sent to '${blue(replyTo)}'`,
-    `for '${blue(appId)}'`
-  ]
-}
+export const formatIncomingRequest = message => [
+  `${formatId(message)}`,
+  `Received request '${yellow(message.fields.routingKey)}'`,
+  `from '${yellow(message.properties.appId)}'`
+].join(' ')
 
-export const toOutgoingError = (message, error) => {
-  const { replyTo, correlationId, appId } = message.properties
-  return [
-    `{${red(correlationId.slice(0, 8))}}`,
-    `Error '${red(error.toString())}'`,
-    `sent to '${red(replyTo)}'`,
-    `for '${red(appId)}'`
-  ]
-}
+export const formatOutgoingError = (message, error) => [
+  `${formatId(message)}`,
+  `Error '${red(error.toString())}'`,
+  `sent to '${red(message.properties.replyTo)}'`,
+  `as response to '${red(message.properties.appId)}'`
+].join(' ')
 
-export const toIncomingError = (message, error) => {
-  const { correlationId, appId } = message.properties
-  return [
-    `{${red(correlationId.slice(0, 8))}}`,
-    `Error '${red(error.toString())}'`,
-    `received from '${red(appId)}'`
-  ]
-}
+export const formatOutgoingResponse = (message, error) => (error ?
+  formatOutgoingError(message, error) :
+  [
+    `${formatId(message)}`,
+    `Response for '${blue(message.properties.appId)}'`,
+    `sent to '${blue(message.properties.replyTo)}'`
+  ].join(' '))
 
-export const toOutgoingRequest = options => [
-  `{${blue(options.correlationId.slice(0, 8))}}`,
-  `Request '${blue(options.routingKey)}'`,
-  `sent by '${blue(options.appId)}'`
-]
+export const formatIncomingError = (message, error) => [
+  `${formatId(message)}`,
+  `Error '${red(error.toString())}'`,
+  `received from '${red(message.properties.appId)}'`
+].join(' ')
 
-export const toMeta = (message, owner) => {
-  const oneRowMessage = Array.isArray(message) ? message.join(' ') : message
+export const formatIncomingResponse = (message, error) => (error ?
+  formatIncomingError(message, error) :
+  [
+    `${formatId(message)}`,
+    `Received response '${yellow(message.fields.routingKey)}'`,
+    `from '${yellow(message.properties.appId)}'`
+  ].join(' '))
+
+export const formatMeta = (source, message) => {
   const time = new Date().toTimeString().split(' ')[0]
 
-  return `[${grey(time)}] [${owner}] ${oneRowMessage}`
+  return `[${grey(time)}] [${source}] ${message}`
 }

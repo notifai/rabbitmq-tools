@@ -31,7 +31,7 @@ export class Router {
 
     this.appId = appId
     this.routes = routes
-    this.logger = logger || console
+    this.logger = typeof logger === 'undefined' ? console : logger
   }
 
   async listen(channel) {
@@ -69,7 +69,7 @@ export class Router {
     validate(message.properties, messageSchema)
 
     const request = JSON.parse(message.content.toString())
-    this.log(logging.toIncomingRequest(message), request)
+    this.log(logging.formatIncomingRequest(message), request)
 
     if (route.requestSchema) {
       validate(request, route.requestSchema)
@@ -104,15 +104,15 @@ export class Router {
       },
     )
 
-    const logMessage = data.error ?
-      logging.toOutgoingError(message, data.error) :
-      logging.toResponse(message)
-
-    this.log(logMessage, data)
+    this.log(logging.formatOutgoingResponse(message, data.error), data)
   }
 
   log(message, data) {
-    this.logger.log(logging.toMeta(message, 'Router'))
+    if (!this.logger) {
+      return
+    }
+
+    this.logger.log(logging.formatMeta('Router', message))
 
     if (data) {
       this.logger.dir(data, { colors: true, depth: 10 })
