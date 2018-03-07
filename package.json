@@ -1,6 +1,6 @@
 {
   "name": "rabbitmq-tools",
-  "version": "0.0.14",
+  "version": "0.0.15",
   "description": "Library for rabbitmq communication",
   "main": "./dist/index.js",
   "scripts": {
@@ -19,6 +19,7 @@
     "url": "https://github.com/trysimply/rabbitmq-tools"
   },
   "license": "Apache License 2.0",
+  "keywords": ["rabbitmq", "amqp", "amqplib", "router", "client", "jsonschema", "validation", "reactive"],
   "dependencies": {
     "amqplib": "0.5.1",
     "babel-polyfill": "^6.26.0",
