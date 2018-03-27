@@ -8,9 +8,19 @@ import { openChannel } from './channel'
 import { Router } from './router'
 import * as logging from './logging'
 
+const toBuffer = obj => Buffer.from(JSON.stringify(obj, null, '\t'))
+
 export class Messenger {
   static create(options) {
     return new Messenger(options)
+  }
+
+  get pubOptions() {
+    return {
+      appId: this.appId,
+      contentEncoding: 'utf-8',
+      contentType: 'application/json'
+    }
   }
 
   constructor(options) {
@@ -48,7 +58,13 @@ export class Messenger {
     await channel.assertQueue(replyTo, { exclusive: true })
     this.assertConsume(channel, replyTo, this.resolveReply)
 
-    this.publish(exchange, routingKey, message, { replyTo, correlationId })
+    this.log(logging.formatOutgoingRequest(correlationId, routingKey, this.appId), message)
+
+    channel.publish(exchange, routingKey, toBuffer(message), {
+      replyTo,
+      correlationId,
+      ...this.pubOptions
+    })
 
     return this.requests.get(correlationId).first().toPromise().then(({ data }) => data)
   }
@@ -73,22 +89,12 @@ export class Messenger {
     }
   }
 
-  async _publish(exchange, routingKey, message, options) {
+  async _publish(exchange, routingKey, message) {
     const channel = await this.getChannel()
 
-    this.log(logging.formatOutgoingRequest(message))
+    this.log(logging.formatEvent(routingKey, this.appId), message)
 
-    return channel.publish(
-      exchange,
-      routingKey,
-      Buffer.from(JSON.stringify(message, null, '\t')),
-      {
-        appId: this.appId,
-        contentEncoding: 'utf-8',
-        contentType: 'application/json',
-        ...options
-      }
-    )
+    return channel.publish(exchange, routingKey, toBuffer(message), this.pubOptions)
   }
 
   getChannel() {

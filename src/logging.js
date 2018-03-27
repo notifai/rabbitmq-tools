@@ -2,10 +2,15 @@ import { yellow, red, blue, grey } from 'chalk'
 
 const formatId = message => `{${yellow(message.properties.correlationId.slice(0, 8))}}`
 
-export const formatOutgoingRequest = message => [
-  `${formatId(message)}`,
-  `Request '${blue(message.fields.routingKey)}'`,
-  `sent by '${blue(message.properties.appId)}'`
+export const formatEvent = (routingKey, appId) => [
+  `Event '${blue(routingKey)}'`,
+  `published by '${blue(appId)}'`
+].join(' ')
+
+export const formatOutgoingRequest = (correlationId, routingKey, appId) => [
+  `{${yellow(correlationId.slice(0, 8))}}`,
+  `Request '${blue(routingKey)}'`,
+  `sent by '${blue(appId)}'`
 ].join(' ')
 
 export const formatIncomingRequest = message => [
