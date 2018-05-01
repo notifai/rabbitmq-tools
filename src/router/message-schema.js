@@ -7,6 +7,6 @@ export default {
     correlationId: { type: 'string', format: 'uuid' },
     replyTo: { type: 'string' }
   },
-  required: ['appId', 'correlationId', 'contentEncoding', 'contentType'],
+  required: ['appId', 'contentEncoding', 'contentType'],
   type: 'object'
 }

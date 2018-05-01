@@ -69,7 +69,7 @@ export class Router {
     validate(message.properties, messageSchema)
 
     const request = JSON.parse(message.content.toString())
-    this.log(logging.formatIncomingRequest(message), request)
+    this.log(logging.formatIncomingMessage(message), request)
 
     if (route.requestSchema) {
       validate(request, route.requestSchema)
