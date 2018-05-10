@@ -2,6 +2,7 @@ import { v4 as uuid } from 'uuid'
 import { Subject } from 'rxjs/Subject'
 import curry from 'lodash/curry'
 import 'rxjs/add/operator/first'
+import 'rxjs/add/operator/partition'
 
 import { connect } from './connection'
 import { openChannel } from './channel'
@@ -15,24 +16,20 @@ export class Messenger {
     return new Messenger(options)
   }
 
-  get pubOptions() {
-    return {
-      appId: this.appId,
-      contentEncoding: 'utf-8',
-      contentType: 'application/json'
-    }
-  }
-
   constructor(options) {
     this.appId = options.appId || 'default-app'
     this.logger = typeof options.logger === 'undefined' ? console : options.logger
     this.channelStore = openChannel(connect(options.url, this.logger), this.logger)
     this.replyQueues = new Set()
     this.requests = new Map()
+    this.pubOptions = {
+      appId: this.appId,
+      contentEncoding: 'utf-8',
+      contentType: 'application/json'
+    }
 
-    this.setupRouter(options)
     this.curry()
-    this.watchChannelQueues()
+    this.watchChannel(options)
   }
 
   async setupRouter(options) {
@@ -104,10 +101,12 @@ export class Messenger {
       .toPromise()
   }
 
-  watchChannelQueues() {
-    return this.channelStore
-      .filter(channel => !channel)
-      .subscribe(() => this.replyQueues.clear())
+  watchChannel(options) {
+    const [onConnect, onDisconnect] = this.channelStore
+      .partition(channel => channel)
+
+    onConnect.subscribe(() => this.setupRouter(options))
+    onDisconnect.subscribe(() => this.replyQueues.clear())
   }
 
   log(message, data) {
