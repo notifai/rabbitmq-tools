@@ -11,9 +11,9 @@ import * as logging from './logging'
 
 const toBuffer = obj => Buffer.from(JSON.stringify(obj, null, '\t'))
 
-export class Messenger {
+export class ReactiveMQ {
   static create(options) {
-    return new Messenger(options)
+    return new ReactiveMQ(options)
   }
 
   constructor(options) {

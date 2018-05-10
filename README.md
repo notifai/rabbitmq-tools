@@ -29,7 +29,7 @@ const routerConfig = {
   ]
 }
 
-const client = Messenger.create({
+const client = ReactiveMQ.create({
   url: 'rabbitMQUrl',
   appId: 'appId',
   routerConfig
