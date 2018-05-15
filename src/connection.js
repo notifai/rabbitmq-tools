@@ -30,7 +30,6 @@ async function startConnection(url, store, logger) {
       if (logger) {
         logger.warn(formatMeta('AMQP', `Connection error: ${error.message}`))
       }
-      reconnect(1000)
     })
 
     connection.on('close', () => {
