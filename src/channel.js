@@ -18,18 +18,12 @@ export const openChannel = (connectionStore, logger) => {
 }
 
 async function startChannel(connection, store, logger) {
-  const restart = delay => {
-    logger.log(formatMeta('AMQP', `Restarting channel in ${delay / 1000} seconds...`))
-    setTimeout(() => startChannel(connection, store, logger), delay)
-  }
-
   connection.createChannel()
     .then(channel => {
       channel.on('error', error => {
         if (logger) {
           logger.log(formatMeta('AMQP', `Channel error: ${error.message}`))
         }
-        restart(1000)
       })
 
       channel.on('close', () => {
@@ -48,6 +42,6 @@ async function startChannel(connection, store, logger) {
       if (logger) {
         logger.warn(formatMeta('AMQP', `Failed to create channel: ${error.message}`))
       }
-      restart(1000)
+      connection.close()
     })
 }

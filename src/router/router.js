@@ -61,7 +61,7 @@ export class Router {
 
       return this.replyWithData(channel, message, response)
     } catch (error) {
-      return this.replyWithError(channel, message, error)
+      return this.replyWithError(channel, message, error.toString())
     }
   }
 
@@ -84,12 +84,12 @@ export class Router {
   }
 
   replyWithError(channel, message, error) {
-    this.reply(channel, message, { error: error.toString() })
+    this.reply(channel, message, { error })
     channel.reject(message, false)
   }
 
   reply(channel, message, data) {
-    if (!message.properties.replyTo) {
+    if (!message || !message.properties || !message.properties.replyTo) {
       return
     }
 
