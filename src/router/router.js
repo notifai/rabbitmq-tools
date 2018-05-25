@@ -85,7 +85,7 @@ export class Router {
 
   replyWithError(channel, message, error) {
     this.reply(channel, message, { error })
-    channel.reject(message, false)
+    channel.reject(message)
   }
 
   reply(channel, message, data) {
