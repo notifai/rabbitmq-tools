@@ -3,45 +3,43 @@ import 'rxjs/add/operator/filter'
 
 import { formatMeta } from './logging'
 
-export const openChannel = (connectionStore, logger) => {
+export const openChannel = (connectionStore, options = { logger: console }) => {
   const store = new BehaviorSubject(null)
 
   connectionStore
     .filter(connection => connection)
-    .subscribe(connection => startChannel(
-      connection,
-      store,
-      typeof logger === 'undefined' ? console : logger
-    ))
+    .subscribe(connection => startRxChannel(connection, store, options))
 
   return store
 }
 
-async function startChannel(connection, store, logger) {
+async function startRxChannel(connection, store, options) {
+  const { logger } = options
+  const connectionId = connection.connectionId || options.connectionId
+  const prefix = connectionId ? `AMQP:${connectionId}` : 'AMQP'
+
+  const log = message => logger && logger.log(formatMeta(prefix, message))
+
   connection.createChannel()
     .then(channel => {
-      channel.on('error', error => {
-        if (logger) {
-          logger.log(formatMeta('AMQP', `Channel error: ${error.message}`))
-        }
-      })
+      channel.on('error', error => (logger || console)
+        .log(`Channel error: ${error.message}`))
 
       channel.on('close', () => {
-        if (logger) {
-          logger.log(formatMeta('AMQP', 'Channel was closed'))
-        }
+        log('Channel was closed')
         store.next(null)
       })
 
-      if (logger) {
-        logger.log(formatMeta('AMQP', 'Channel has been opened'))
-      }
+      log('Channel has been opened')
+      Object.assign(channel, { connectionId })
       store.next(channel)
     })
     .catch(error => {
       if (logger) {
-        logger.warn(formatMeta('AMQP', `Failed to create channel: ${error.message}`))
+        logger.warn(formatMeta(prefix, `Failed to create channel: ${error.message}`))
       }
       connection.close()
     })
+
+  return store
 }

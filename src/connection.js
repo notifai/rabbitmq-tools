@@ -3,51 +3,45 @@ import { BehaviorSubject } from 'rxjs/BehaviorSubject'
 
 import { formatMeta } from './logging'
 
-export const connect = (url, logger) => {
-  const store = new BehaviorSubject(null)
+// TODO: implement connection close
+export const connect = (url, options = { logger: console }) => startRxConnection(
+  url,
+  new BehaviorSubject(null),
+  options
+)
 
-  startConnection(
-    url,
-    store,
-    typeof logger === 'undefined' ? console : logger
-  )
+function startRxConnection(url, store, options) {
+  const { logger } = options
+  const connectionId = options.connectionId || (options.url && options.url.vhost)
+  const prefix = connectionId ? `AMQP:${connectionId}` : 'AMQP'
+
+  const log = message => logger && logger.log(formatMeta(prefix, message))
+  const reconnect = delay => {
+    log(`Reconnecting in ${delay / 1000} seconds...`)
+    setTimeout(() => startRxConnection(url, store, options), delay)
+  }
+
+  Promise.resolve(amqp.connect(url))
+    .then(connection => {
+      connection.on('error', error => (logger || console)
+        .warn(formatMeta(prefix, `Connection error: ${error.message}`)))
+
+      connection.on('close', () => {
+        log('Connection was closed')
+        store.next(null)
+        reconnect(1000)
+      })
+
+      log('Connected')
+      Object.assign(connection, { connectionId })
+      store.next(connection)
+    })
+    .catch(error => {
+      if (logger) {
+        logger.warn(formatMeta(prefix, `Failed to connect: ${error.message}`))
+      }
+      reconnect(5000)
+    })
 
   return store
-}
-
-async function startConnection(url, store, logger) {
-  const reconnect = delay => {
-    if (logger) {
-      logger.log(formatMeta('AMQP', `Reconnecting in ${delay / 1000} seconds...`))
-    }
-    setTimeout(() => startConnection(url, store, logger), delay)
-  }
-
-  try {
-    const connection = await amqp.connect(url)
-
-    connection.on('error', error => {
-      if (logger) {
-        logger.warn(formatMeta('AMQP', `Connection error: ${error.message}`))
-      }
-    })
-
-    connection.on('close', () => {
-      if (logger) {
-        logger.log(formatMeta('AMQP', 'Connection was closed'))
-      }
-      store.next(null)
-      reconnect(1000)
-    })
-
-    if (logger) {
-      logger.log(formatMeta('AMQP', 'Connected'))
-    }
-    store.next(connection)
-  } catch (error) {
-    if (logger) {
-      logger.warn(formatMeta('AMQP', `Failed to connect: ${error.message}`))
-    }
-    reconnect(5000)
-  }
 }

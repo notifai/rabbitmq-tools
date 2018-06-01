@@ -1,6 +1,6 @@
 import { v4 as uuid } from 'uuid'
 import { Subject } from 'rxjs/Subject'
-import curry from 'lodash/curry'
+import curry from 'lodash.curry'
 import 'rxjs/add/operator/first'
 import 'rxjs/add/operator/partition'
 
@@ -9,6 +9,8 @@ import { openChannel } from './channel'
 import { Router } from './router'
 import * as logging from './logging'
 
+const PUB_OPTIONS = { contentEncoding: 'utf-8', contentType: 'application/json' }
+
 const toBuffer = obj => Buffer.from(JSON.stringify(obj, null, '\t'))
 
 export class ReactiveMQ {
@@ -16,30 +18,32 @@ export class ReactiveMQ {
     return new ReactiveMQ(options)
   }
 
-  constructor(options) {
-    this.appId = options.appId || 'default-app'
-    this.logger = typeof options.logger === 'undefined' ? console : options.logger
-    this.channelStore = openChannel(connect(options.url, this.logger), this.logger)
+  get channelAsPromised() {
+    return this.rxChannel
+      .filter(channel => channel)
+      .first()
+      .toPromise()
+  }
+
+  get commonOptions() {
+    return { logger: this.logger, connectionId: this.connectionId }
+  }
+
+  constructor({ appId = 'rx-amqp-client', logger = console, ...options }) {
+    this.appId = appId
+    this.logger = logger
+    this.connectionId = options.connectionId || (options.url && options.url.vhost)
+    this.routerConfig = options.routerConfig
+
+    this.rxConnection = connect(options.url, this.commonOptions)
+    this.rxChannel = openChannel(this.rxConnection, this.commonOptions)
+
     this.replyQueues = new Set()
     this.requests = new Map()
-    this.pubOptions = {
-      appId: this.appId,
-      contentEncoding: 'utf-8',
-      contentType: 'application/json'
-    }
+    this.pubOptions = { appId: this.appId, ...PUB_OPTIONS }
 
     this.curry()
     this.watchChannel(options)
-  }
-
-  async setupRouter(options) {
-    return options.routerConfig &&
-      Router.listen({
-        logger: options.logger,
-        appId: options.appId,
-        ...options.routerConfig,
-        channel: await this.getChannel()
-      })
   }
 
   curry() {
@@ -47,11 +51,32 @@ export class ReactiveMQ {
     this.publish = curry(this._publish.bind(this)) // eslint-disable-line no-underscore-dangle
   }
 
+  watchChannel() {
+    const [onConnect, onDisconnect] = this.rxChannel
+      .partition(channel => channel)
+
+    onConnect.subscribe(() => this.setupRouter())
+    onDisconnect.subscribe(() => this.replyQueues.clear())
+  }
+
+  async setupRouter(routerConfig = this.routerConfig) {
+    if (!routerConfig) {
+      return Promise.resolve(null)
+    }
+
+    return Router.listen({
+      ...routerConfig,
+      ...this.commonOptions,
+      appId: this.appId,
+      channel: await this.channelAsPromised
+    })
+  }
+
   async _request(exchange, replyTo, routingKey, message) {
     const correlationId = uuid()
     this.requests.set(correlationId, new Subject())
 
-    const channel = await this.getChannel()
+    const channel = await this.channelAsPromised
     await channel.assertQueue(replyTo, { exclusive: true })
     this.assertConsume(channel, replyTo, this.resolveReply)
 
@@ -87,26 +112,11 @@ export class ReactiveMQ {
   }
 
   async _publish(exchange, routingKey, message) {
-    const channel = await this.getChannel()
+    const channel = await this.channelAsPromised
 
     this.log(logging.formatEvent(routingKey, this.appId), message)
 
     return channel.publish(exchange, routingKey, toBuffer(message), this.pubOptions)
-  }
-
-  getChannel() {
-    return this.channelStore
-      .filter(channel => channel)
-      .first()
-      .toPromise()
-  }
-
-  watchChannel(options) {
-    const [onConnect, onDisconnect] = this.channelStore
-      .partition(channel => channel)
-
-    onConnect.subscribe(() => this.setupRouter(options))
-    onDisconnect.subscribe(() => this.replyQueues.clear())
   }
 
   log(message, data) {
@@ -114,7 +124,8 @@ export class ReactiveMQ {
       return
     }
 
-    this.logger.log(logging.formatMeta('AMQP', message))
+    const prefix = this.connectionId ? `Client:${this.connectionId}` : 'Router'
+    this.logger.log(logging.formatMeta(prefix, message))
 
     if (data) {
       this.logger.dir(data, { colors: true, depth: 10 })

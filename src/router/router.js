@@ -1,67 +1,74 @@
 import uuid from 'uuid'
-import kebabCase from 'lodash/kebabCase'
 import { yellow } from 'chalk'
 
 import { validate } from '../schema-validator'
 import messageSchema from './message-schema'
 import * as logging from '../logging'
 
-const { NODE_ENV } = process.env
+const validateRouterOptions = options => {
+  if (!options.channel) {
+    throw new Error('"config.channel" is required')
+  }
+
+  if (!options.appId) {
+    throw new Error('"config.appId" is required')
+  }
+}
 
 export class Router {
-  static create(config) {
-    return new Router(config)
-  }
-
   static listen(config) {
-    if (!config.channel) {
-      throw new Error('"config.channel" is required to start listening')
+    if (!config.routes || !config.routes.length) {
+      throw new Error('"config.routes" is required')
     }
 
-    const router = Router.create(config)
-
-    return router.listen(config.channel)
-      .then(() => router)
+    const router = new Router(config)
+    return router.listen().then(() => router)
   }
 
-  constructor({ appId, routes, logger }) {
-    if (!appId) {
-      throw new Error('"config.appId" is required')
-    }
+  constructor(options) {
+    validateRouterOptions(options)
 
-    this.appId = appId
-    this.routes = routes
-    this.logger = typeof logger === 'undefined' ? console : logger
+    this.channel = options.channel
+    this.appId = options.appId
+    this.routes = options.routes
+    this.logger = options.logger || console
+    this.connectionId = options.connectionId || options.channel.connectionId
   }
 
-  async listen(channel) {
-    await channel.prefetch(1)
-    await Promise.all(this.routes.map(route => this.bindChannel(channel, route)))
+  async listen() {
+    await this.channel.prefetch(1)
+    await Promise.all(this.routes.map(route => this.bindChannel(route)))
   }
 
-  async bindChannel(channel, route) {
-    const queue = kebabCase(`${this.appId}-${route.routingKey}`)
+  async bindChannel(route) {
+    const queue = `${this.appId}.${route.routingKey}`
 
-    await channel.assertQueue(queue, { durable: true })
-    await channel.bindQueue(queue, route.exchange, route.routingKey)
-
-    await channel.consume(queue, message => this.route(message, channel, route), {
-      consumerTag: `${this.appId}-${process.pid}-${uuid.v4()}`,
-      priority: NODE_ENV === 'development' ? 100 : null
+    await this.channel.assertQueue(queue, route.queueOptions)
+    await this.channel.bindQueue(queue, route.exchange, route.routingKey)
+    await this.channel.consume(queue, message => this.route(message, route), {
+      consumerTag: `${this.appId}-${uuid.v4()}`,
+      ...(route.consumerOptions || {})
     })
 
     this.log(`Starts listening to '${yellow(queue)}'`)
   }
 
-  async route(message, channel, route) {
+  async route(message, route) {
+    // TODO: think on better requeue logic (in case of replyWithData too)
+    let requeueOnError = false
+    const requeue = () => { requeueOnError = true }
+
     try {
       const request = this.getValidRequest(message, route)
+      const response = await Promise.resolve(route.resolver(request, this.channel, requeue))
 
-      const response = await Promise.resolve(route.resolver(request, channel))
-
-      return this.replyWithData(channel, message, response)
+      return this.replyWithData(message, response)
     } catch (error) {
-      return this.replyWithError(channel, message, error.toString())
+      return this.replyWithError({
+        message,
+        error: error.toString(),
+        requeue: requeueOnError
+      })
     }
   }
 
@@ -78,22 +85,22 @@ export class Router {
     return request
   }
 
-  replyWithData(channel, message, data) {
-    this.reply(channel, message, { data })
-    channel.ack(message)
+  replyWithData(message, data) {
+    this.reply(message, { data })
+    this.channel.ack(message)
   }
 
-  replyWithError(channel, message, error) {
-    this.reply(channel, message, { error })
-    channel.reject(message)
+  replyWithError({ message, error, requeue = false }) {
+    this.reply(message, { error })
+    this.channel.reject(message, requeue)
   }
 
-  reply(channel, message, data) {
+  reply(message, data) {
     if (!message || !message.properties || !message.properties.replyTo) {
       return
     }
 
-    channel.sendToQueue(
+    this.channel.sendToQueue(
       message.properties.replyTo,
       Buffer.from(JSON.stringify(data, null, '\t')),
       {
@@ -112,7 +119,8 @@ export class Router {
       return
     }
 
-    this.logger.log(logging.formatMeta('Router', message))
+    const prefix = this.connectionId ? `Router:${this.connectionId}` : 'Router'
+    this.logger.log(logging.formatMeta(prefix, message))
 
     if (data) {
       this.logger.dir(data, { colors: true, depth: 10 })
