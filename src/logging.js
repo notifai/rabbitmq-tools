@@ -32,6 +32,12 @@ export const formatOutgoingError = (message, error) => [
   `as response to '${red(message.properties.appId)}'`
 ].join(' ')
 
+export const formatSubscriptionError = (message, error) => [
+  `Error '${red(error.toString())}'`,
+  `on event '${yellow(message.fields.routingKey)}'`,
+  `emitted by '${yellow(message.properties.appId)}'`
+].join(' ')
+
 export const formatOutgoingResponse = (message, error) => (error ?
   formatOutgoingError(message, error) :
   [

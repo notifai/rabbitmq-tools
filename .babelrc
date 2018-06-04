@@ -1,7 +1,10 @@
 {
   "plugins": [
-    "transform-object-rest-spread",
-    "transform-decorators-legacy"
+    "syntax-object-rest-spread",
+    ["transform-runtime", {
+      "polyfill": false,
+      "regenerator": true
+    }]
   ],
   "presets": [
     "env"

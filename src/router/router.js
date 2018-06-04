@@ -64,6 +64,7 @@ export class Router {
 
       return this.replyWithData(message, response)
     } catch (error) {
+      this.log(logging.formatSubscriptionError(message, error))
       return this.replyWithError({
         message,
         error: error.toString(),
