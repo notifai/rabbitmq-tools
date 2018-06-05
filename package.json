@@ -1,6 +1,6 @@
 {
   "name": "rabbitmq-tools",
-  "version": "0.1.38",
+  "version": "0.1.39",
   "description": "Library for rabbitmq communication",
   "main": "./dist/index.js",
   "scripts": {

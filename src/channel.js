@@ -20,7 +20,7 @@ async function startRxChannel(connection, store, options) {
 
   const log = message => logger && logger.log(formatMeta(prefix, message))
 
-  connection.createChannel()
+  Promise.resolve(connection.createChannel())
     .then(channel => {
       channel.on('error', error => (logger || console)
         .log(`Channel error: ${error.message}`))

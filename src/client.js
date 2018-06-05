@@ -33,7 +33,7 @@ export class ReactiveMQ {
     this.appId = appId
     this.logger = logger
     this.connectionId = options.connectionId || (options.url && options.url.vhost)
-    this.routerConfig = options.routerConfig
+    this.loggingPrefix = this.connectionId ? `Client:${this.connectionId}` : 'Client'
 
     this.rxConnection = connect(options.url, this.commonOptions)
     this.rxChannel = openChannel(this.rxConnection, this.commonOptions)
@@ -42,8 +42,12 @@ export class ReactiveMQ {
     this.requests = new Map()
     this.pubOptions = { appId: this.appId, ...PUB_OPTIONS }
 
+    if (options.routerConfig) {
+      this.connectRouter(options.routerConfig)
+    }
+
     this.curry()
-    this.watchChannel(options)
+    this.watchChannel()
   }
 
   curry() {
@@ -52,24 +56,26 @@ export class ReactiveMQ {
   }
 
   watchChannel() {
-    const [onConnect, onDisconnect] = this.rxChannel
-      .partition(channel => channel)
-
-    onConnect.subscribe(() => this.setupRouter())
-    onDisconnect.subscribe(() => this.replyQueues.clear())
+    this.rxChannel
+      .filter(channel => !channel)
+      .subscribe(() => this.replyQueues.clear())
   }
 
-  async setupRouter(routerConfig = this.routerConfig) {
+  async connectRouter(routerConfig) {
+    if (this.router) { return }
+
     if (!routerConfig) {
-      return Promise.resolve(null)
+      throw new Error(`[${this.loggingPrefix}]: "config.routerConfig" is required to start routing`)
     }
 
-    return Router.listen({
-      ...routerConfig,
-      ...this.commonOptions,
-      appId: this.appId,
-      channel: await this.channelAsPromised
-    })
+    if (routerConfig) {
+      this.router = Router.create({
+        ...routerConfig,
+        ...this.commonOptions,
+        appId: this.appId,
+        channel: this.rxChannel
+      })
+    }
   }
 
   async _request(exchange, replyTo, routingKey, message) {
@@ -120,12 +126,9 @@ export class ReactiveMQ {
   }
 
   log(message, data) {
-    if (!this.logger) {
-      return
-    }
+    if (!this.logger) { return }
 
-    const prefix = this.connectionId ? `Client:${this.connectionId}` : 'Router'
-    this.logger.log(logging.formatMeta(prefix, message))
+    this.logger.log(logging.formatMeta(this.loggingPrefix, message))
 
     if (data) {
       this.logger.dir(data, { colors: true, depth: 10 })

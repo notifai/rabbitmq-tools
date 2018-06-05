@@ -13,26 +13,36 @@ const validateRouterOptions = options => {
   if (!options.appId) {
     throw new Error('"config.appId" is required')
   }
+
+  if (!options.routes) {
+    throw new Error('"config.routes" is required')
+  }
 }
 
 export class Router {
-  static listen(config) {
-    if (!config.routes || !config.routes.length) {
-      throw new Error('"config.routes" is required')
-    }
-
-    const router = new Router(config)
-    return router.listen().then(() => router)
+  static create(...args) {
+    return new Router(...args)
   }
 
   constructor(options) {
     validateRouterOptions(options)
 
-    this.channel = options.channel
+    this.rxChannel = options.channel
     this.appId = options.appId
     this.routes = options.routes
     this.logger = options.logger || console
     this.connectionId = options.connectionId || options.channel.connectionId
+
+    this.watchChannel()
+  }
+
+  watchChannel() {
+    this.rxChannel
+      .filter(channel => channel)
+      .subscribe(channel => {
+        this.channel = channel
+        return this.listen()
+      })
   }
 
   async listen() {
