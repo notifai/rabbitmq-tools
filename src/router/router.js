@@ -24,13 +24,13 @@ export class Router {
     return new Router(...args)
   }
 
-  constructor(options) {
+  constructor({ logger = console, ...options }) {
     validateRouterOptions(options)
 
     this.rxChannel = options.channel
     this.appId = options.appId
     this.routes = options.routes
-    this.logger = options.logger || console
+    this.logger = logger
     this.connectionId = options.connectionId || options.channel.connectionId
 
     this.watchChannel()
@@ -54,11 +54,22 @@ export class Router {
     const queue = `${this.appId}.${route.routingKey}`
 
     await this.channel.assertQueue(queue, route.queueOptions)
+      .catch(error => {
+        this.log(`Failed to assert queue '${queue}'`)
+        this.logger.log(error)
+      })
     await this.channel.bindQueue(queue, route.exchange, route.routingKey)
-    await this.channel.consume(queue, message => this.route(message, route), {
-      consumerTag: `${this.appId}-${uuid.v4()}`,
-      ...(route.consumerOptions || {})
-    })
+      .catch(error => {
+        this.log(`Failed to bindQueue queue '${queue}', on exchange '${route.exchange}', routing key '${route.routingKey}'`)
+        this.logger.log(error)
+      })
+    await this.channel.consume(queue, message => this.route(message, route), Object.assign({
+      consumerTag: `${this.appId}-${uuid.v4()}`
+    }, route.consumerOptions))
+      .catch(error => {
+        this.log(`Failed to consume queue '${queue}'`)
+        this.logger.log(error)
+      })
 
     this.log(`Starts listening to '${yellow(queue)}'`)
   }

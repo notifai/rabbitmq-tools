@@ -28,6 +28,7 @@ async function startRxChannel(connection, store, options) {
       channel.on('close', () => {
         log('Channel was closed')
         store.next(null)
+        connection.close()
       })
 
       log('Channel has been opened')

@@ -1,12 +1,12 @@
 {
   "plugins": [
-    "syntax-object-rest-spread",
     ["transform-runtime", {
       "polyfill": false,
       "regenerator": true
     }]
   ],
   "presets": [
+    "stage-3",
     "env"
   ]
 }
